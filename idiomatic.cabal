@@ -65,6 +65,7 @@ library
   build-depends:       base >=4.9 && <4.18
   hs-source-dirs:      src
   default-language:    Haskell98
+  ghc-options:         -Wall
 
 source-repository head
   type: git

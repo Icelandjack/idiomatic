@@ -18,22 +18,18 @@
 {-# Language StandaloneKindSignatures   #-}
 
 module Generic.Applicative 
-  ( Idiomatically(..)
+  ( Idiomatically
   , Generically1(..)
   , NewSums(..)
   , module Generic.Applicative.Idiom
   ) where
 
-import GHC.Generics
-import Data.Kind
 import Control.Applicative
+import Data.Functor.Sum
+import Data.Kind
 
 import Generic.Applicative.Internal
 import Generic.Applicative.Idiom
-
-import Data.Functor.Sum
-import Data.Functor.Identity
--- import Control.Applicative      -- TODO
 
 type    LeftBias :: tagKind -> (k -> Type) -> (k -> Type) -> (k -> Type)
 newtype LeftBias tag f g a = LeftBias (Sum f g a)

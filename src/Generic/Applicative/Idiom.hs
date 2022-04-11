@@ -18,10 +18,8 @@ module Generic.Applicative.Idiom where
 
 import Control.Applicative
 import Data.Functor.Compose
-import Data.Functor.Const
 import Data.Functor.Identity
 import Data.Functor.Product
-import Data.Functor.Sum
 import Data.Kind
 import Data.Proxy
 
@@ -121,8 +119,8 @@ instance (Applicative outer, Applicative f, comp ~ Compose outer f) => Idiom Out
 -- Data.Functor.Product
 type family
   CheckIdiomDup f where
-  CheckIdiomDup (Product _ _) = True
-  CheckIdiomDup _             = False
+  CheckIdiomDup (Product _ _) = 'True
+  CheckIdiomDup _             = 'False
 
 -- | This applicative morphism duplicates a functor any number of times.
 -- 
@@ -145,11 +143,11 @@ class (CheckIdiomDup g ~ tag, Applicative f, Applicative g) => IdiomDup tag f g 
   idiomDup :: f ~> g
   idiomDup = undefined
 
-instance (Applicative f, CheckIdiomDup f ~ False, f ~ f') => IdiomDup False f f' where
+instance (Applicative f, CheckIdiomDup f ~ 'False, f ~ f') => IdiomDup 'False f f' where
   idiomDup :: f ~> f
   idiomDup = id
 
-instance (f ~ g, IdiomDup (CheckIdiomDup g') g g') => IdiomDup True f (Product g g') where
+instance (f ~ g, IdiomDup (CheckIdiomDup g') g g') => IdiomDup 'True f (Product g g') where
   idiomDup :: f ~> Product g g'
   idiomDup as = Pair as (idiomDup as)
 

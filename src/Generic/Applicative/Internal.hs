@@ -1,3 +1,5 @@
+{-# Options_GHC -Wno-name-shadowing #-}
+
 {-# Language AllowAmbiguousTypes        #-}
 {-# Language CPP                        #-}
 {-# Language ConstraintKinds            #-}
@@ -24,16 +26,13 @@ module Generic.Applicative.Internal where
 
 import Control.Applicative
 import Data.Coerce
-import Data.Functor.Classes
 import Data.Functor.Compose
-import Data.Functor.Const
 import Data.Functor.Identity
 import Data.Functor.Product
 import Data.Functor.Sum
 import Data.Kind
 import Data.Proxy
 import Data.Void
-import GHC.Generics
 import GHC.Generics
 import Unsafe.Coerce
 
@@ -144,8 +143,8 @@ instance ConvProduct rep1 => ConvSum (C1 meta rep1) where
   convToSumSkip = InR
 
   convFromSum :: Sum (ToProduct rep1 (Const ())) end a -> (C1 meta rep1 a -> res) -> (end a -> res) -> res
-  convFromSum (InL prod) fromC1 fromEnd = convFromProduct @_ @rep1 @(Const ()) prod $ \r end -> fromC1 (M1 r)
-  convFromSum (InR end)  fromC1 fromEnd = fromEnd end
+  convFromSum (InL prod) fromC1 _       = convFromProduct @_ @rep1 @(Const ()) prod $ \r _ -> fromC1 (M1 r)
+  convFromSum (InR end)  _      fromEnd = fromEnd end
 
 -- ×
 
@@ -229,9 +228,9 @@ type
   CheckSum :: (k -> Type) -> SumTag
 type family
   CheckSum rep1 where
-  CheckSum (Sum rep1 (Const Void)) = RightZero
-  CheckSum (Sum rep1 rep')         = NormalSum
-  CheckSum rep                     = NotSum
+  CheckSum (Sum rep1 (Const Void)) = 'RightZero
+  CheckSum (Sum rep1 rep')         = 'NormalSum
+  CheckSum rep                     = 'NotSum
 
 type BæSum :: (k -> Type) -> (k -> Type)
 type BæSum rep1 = BæSum_ (CheckSum rep1) rep1
@@ -247,8 +246,8 @@ class CheckSum rep1 ~ tag
   convBæSum :: rep1 ~> BæSum rep1
   convHæSum :: BæSum rep1 ~> rep1
 
-instance (ConvBæProduct rep1, CheckSum (Sum rep1 (Const Void)) ~ RightZero, void ~ Void) => ConvBæSum_ RightZero (Sum rep1 (Const void)) where
-  type BæSum_ RightZero (Sum rep1 (Const void)) = BæProduct rep1
+instance (ConvBæProduct rep1, CheckSum (Sum rep1 (Const Void)) ~ 'RightZero, void ~ Void) => ConvBæSum_ 'RightZero (Sum rep1 (Const void)) where
+  type BæSum_ 'RightZero (Sum rep1 (Const void)) = BæProduct rep1
   convBæSum :: Sum rep1 (Const Void) ~> BæProduct rep1
   convBæSum = \case
     InL r  -> convBæProduct r
@@ -257,11 +256,11 @@ instance (ConvBæProduct rep1, CheckSum (Sum rep1 (Const Void)) ~ RightZero, voi
   convHæSum :: BæProduct rep1 ~> Sum rep1 (Const Void)
   convHæSum bæProd = InL (convHæProduct bæProd)
 
-instance ( CheckSum (Sum rep1 rep1') ~ NormalSum
+instance ( CheckSum (Sum rep1 rep1') ~ 'NormalSum
          , ConvBæProduct rep1 
          , ConvBæSum rep1' )
-      => ConvBæSum_ NormalSum (Sum rep1 rep1') where
-  type BæSum_ NormalSum (Sum rep1 rep1') = Sum (BæProduct rep1) (BæSum rep1')
+      => ConvBæSum_ 'NormalSum (Sum rep1 rep1') where
+  type BæSum_ 'NormalSum (Sum rep1 rep1') = Sum (BæProduct rep1) (BæSum rep1')
   convBæSum :: Sum rep1 rep1' ~> Sum (BæProduct rep1) (BæSum rep1')
   convBæSum = \case
    InL r  -> InL (convBæProduct r)
@@ -271,9 +270,9 @@ instance ( CheckSum (Sum rep1 rep1') ~ NormalSum
   convHæSum (InL bæProd) = InL (convHæProduct bæProd)
   convHæSum (InR bæSum)  = InR (convHæSum bæSum)
 
-instance CheckSum rep1 ~ NotSum
-      => ConvBæSum_ NotSum rep1 where
-  type BæSum_ NotSum rep1 = rep1
+instance CheckSum rep1 ~ 'NotSum
+      => ConvBæSum_ 'NotSum rep1 where
+  type BæSum_ 'NotSum rep1 = rep1
   convBæSum :: rep1 ~> rep1
   convHæSum :: rep1 ~> rep1
   convBæSum = id
@@ -288,9 +287,9 @@ type
   CheckProduct :: (k -> Type) -> ProductTag
 type family
   CheckProduct rep1 where
-  CheckProduct (Product rep1 (Const ())) = RightOne
-  CheckProduct (Product rep1 rep')       = NormalProduct
-  CheckProduct rep                       = NotProduct
+  CheckProduct (Product rep1 (Const ())) = 'RightOne
+  CheckProduct (Product rep1 rep')       = 'NormalProduct
+  CheckProduct rep                       = 'NotProduct
 
 type BæProduct :: (k -> Type) -> (k -> Type)
 type BæProduct rep1 = BæProduct_ (CheckProduct rep1) rep1
@@ -306,8 +305,8 @@ class tag ~ CheckProduct rep1
   convBæProduct :: rep1 ~> BæProduct rep1
   convHæProduct :: BæProduct rep1 ~> rep1
 
-instance unit ~ () => ConvBæProduct_ RightOne (Product rep1 (Const unit)) where 
-  type BæProduct_ RightOne (Product rep1 (Const unit)) = rep1
+instance unit ~ () => ConvBæProduct_ 'RightOne (Product rep1 (Const unit)) where 
+  type BæProduct_ 'RightOne (Product rep1 (Const unit)) = rep1
 
   convBæProduct :: Product rep1 (Const ()) ~> rep1
   convBæProduct (Pair r (Const ())) = r
@@ -315,20 +314,20 @@ instance unit ~ () => ConvBæProduct_ RightOne (Product rep1 (Const unit)) where
   convHæProduct :: rep1 ~> Product rep1 (Const ())
   convHæProduct r = Pair r (Const ())
 
-instance ( CheckProduct (Product rep1 rep1') ~ NormalProduct
+instance ( CheckProduct (Product rep1 rep1') ~ 'NormalProduct
          , ConvBæProduct rep1'
          )
-      => ConvBæProduct_ NormalProduct (Product rep1 rep1') where 
-  type BæProduct_ NormalProduct (Product rep1 rep1') = Product rep1 (BæProduct rep1')
+      => ConvBæProduct_ 'NormalProduct (Product rep1 rep1') where 
+  type BæProduct_ 'NormalProduct (Product rep1 rep1') = Product rep1 (BæProduct rep1')
   convBæProduct :: Product rep1 rep1' ~> Product rep1 (BæProduct rep1')
   convBæProduct (Pair r r') = Pair r (convBæProduct r')
 
   convHæProduct :: Product rep1 (BæProduct rep1') ~> Product rep1 rep1'
   convHæProduct (Pair r bæProd) = Pair r (convHæProduct bæProd)
 
-instance CheckProduct rep1 ~ NotProduct
-      => ConvBæProduct_ NotProduct rep1 where
-  type BæProduct_ NotProduct rep1 = rep1
+instance CheckProduct rep1 ~ 'NotProduct
+      => ConvBæProduct_ 'NotProduct rep1 where
+  type BæProduct_ 'NotProduct rep1 = rep1
 
   convHæProduct :: rep1 ~> rep1
   convBæProduct :: rep1 ~> rep1
