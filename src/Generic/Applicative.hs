@@ -18,7 +18,9 @@
 {-# Language StandaloneKindSignatures   #-}
 
 module Generic.Applicative 
-  ( Idiomatically
+  ( LeftBias(..)
+  , RightBias(..)
+  , Idiomatically
   , Generically1(..)
   , NewSums(..)
   , module Generic.Applicative.Idiom
