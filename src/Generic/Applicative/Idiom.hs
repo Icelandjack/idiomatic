@@ -3,6 +3,7 @@
 {-# Language DeriveFunctor            #-}
 {-# Language DerivingStrategies       #-}
 {-# Language EmptyDataDecls           #-}
+{-# Language FlexibleContexts         #-}
 {-# Language FlexibleInstances        #-}
 {-# Language InstanceSigs             #-}
 {-# Language MultiParamTypeClasses    #-}
