@@ -88,7 +88,7 @@ data Terminal
 instance (Applicative f, Monoid m) => Idiom Terminal f (Const m) where
   idiom :: f ~> Const m
   idiom = mempty
-instance (Applicative f, Monoid m) => Idiom Terminal f Proxy where
+instance (Applicative f) => Idiom Terminal f Proxy where
   idiom :: f ~> Proxy
   idiom = mempty
 
