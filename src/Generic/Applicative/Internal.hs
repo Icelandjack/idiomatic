@@ -40,45 +40,89 @@ import Unsafe.Coerce
 #define HAS_GENERICALLY
 #endif
 
+-- | The kind of a lifted binary type constructor.
+--
+-- @
+-- Sum     :: SumKind k
+-- Product :: SumKind k
+--
+-- (:+:)   :: SumKind k
+-- (:*:)   :: SumKind k
+-- @
+--
+-- Definition:
+--
+-- @
+-- type SumKind :: Type -> Type
+-- type SumKind k = (k -> Type) -> (k -> Type) -> (k -> Type)
+-- @
 type SumKind :: Type -> Type
 type SumKind k = (k -> Type) -> (k -> Type) -> (k -> Type)
 
+-- | A polymorphic function / natural transformation.
+--
+-- Used for /Applicative homomorphisms/ ('Idiom'):
+--
+-- @
+-- idiom @_ @tag :: Idiom tag l r => l ~> r
+-- @
+--
+-- Definition:
+--
+-- @
+-- type (~>) :: (k -> Type) -> (k -> Type) -> Type
+-- type f ~> g = forall x. f x -> g x
+-- @
 type (~>) :: (k -> Type) -> (k -> Type) -> Type
 type f ~> g = forall x. f x -> g x
 
+-- | 'Data.Void.absurd' for @Const Void@.
+--
+-- @
+-- absurdZero :: Const Void a -> b
+-- absurdZero (Const void) = absurd void
+-- @
 absurdZero :: Const Void a -> b
 absurdZero (Const void) = absurd void
 
+-- | 'Data.Void.absurd' for 'V1'.
+--
+-- @
+-- absurdV1 :: V1 a -> b
+-- absurdV1 = \case
+-- @
 absurdV1 :: V1 a -> b
 absurdV1 = \case
 
 -- This is following a couple of requirements:
--- 
+--
 --  1. I want to use the more user-facing Data.Functor vocabulary
 --     rather than GHC.Generics.
--- 
+--
 --  2. I want to get rid of nested functors
--- 
+--
 --       (Par1 :*: Par1) :*: (Par1 :*: Par1)
---     
+--
 --     intead I want
 --
 --       Product (Product Identity Identity) (Product Identity Identity)
--- 
+--
 --  3. I don't want to terminate the sums or products with @Const
 --     Void@ or @Const ()@.
--- 
+--
 --  4. The sums should be replaced by a type-level list of sums, such
 --     that the user can override its Applicative behaviour.
--- 
+--
 -- 'ConvSum' (1. and 2.) translates to Sum, Product and Compose and
 -- flattens the representation, but this results in terminating
 -- functors @Const Void@ and @Const ()@.
 --
 -- 'ConvBæSum' (3.) removes terminating @Const Void@ and @Const ()@.
--- 
+--
 -- @ReplaceSums [sum1, sum2, ..] rep1@ replaces the sums of a
 -- representation @rep1@.
+
+-- | The first thing I do is to convert
 type  ConvSum :: (k -> Type) -> Constraint
 class ConvSum (rep1 :: k -> Type) where
   type ToSum (rep1 :: k -> Type) (end :: k -> Type) :: k -> Type
@@ -96,7 +140,7 @@ instance (ConvSum rep1, ConvSum rep1') => ConvSum (rep1 :+: rep1') where
     asToSum :: Proxy end -> Proxy (ToSum rep1' end)
     asToSum = mempty
 
-  convToSum end (R1 r1) = convToSumSkip @_ @rep1 @(ToSum rep1' end) 
+  convToSum end (R1 r1) = convToSumSkip @_ @rep1 @(ToSum rep1' end)
     (convToSum end r1)
 
   convToSumSkip :: end ~> ToSum rep1 (ToSum rep1' end)
@@ -104,8 +148,8 @@ instance (ConvSum rep1, ConvSum rep1') => ConvSum (rep1 :+: rep1') where
     (convToSumSkip @_ @rep1' end)
 
   convFromSum :: forall end res a. ToSum rep1 (ToSum rep1' end) a -> ((rep1 :+: rep1') a -> res) -> (end a -> res) -> res
-  convFromSum sum fromSum fromEnd = 
-    convFromSum sum (fromSum . L1) $ \sum' -> 
+  convFromSum sum fromSum fromEnd =
+    convFromSum sum (fromSum . L1) $ \sum' ->
       convFromSum sum' (fromSum . R1) fromEnd
 
 instance ConvSum V1 where
@@ -127,7 +171,7 @@ instance ConvSum rep1 => ConvSum (D1 meta rep1) where
   convToSum end (M1 d1) = convToSum end d1
 
   convToSumSkip :: end ~> ToSum rep1 end
-  convToSumSkip = convToSumSkip @_ @rep1 
+  convToSumSkip = convToSumSkip @_ @rep1
 
   convFromSum :: ToSum rep1 end a -> (D1 meta rep1 a -> res) -> (end a -> res) -> res
   convFromSum sum fromD1 = convFromSum sum (fromD1 . M1)
@@ -136,7 +180,7 @@ instance ConvProduct rep1 => ConvSum (C1 meta rep1) where
   type ToSum (C1 meta rep1) end = Sum (ToProduct rep1 (Const ())) end
 
   convToSum :: forall end. Proxy end -> C1 meta rep1 ~> Sum (ToProduct rep1 (Const ())) end
-  convToSum Proxy (M1 c1) = InL 
+  convToSum Proxy (M1 c1) = InL
     (convToProduct @_ @rep1 c1 (Const ()))
 
   convToSumSkip :: end ~> Sum (ToProduct rep1 (Const ())) end
@@ -151,7 +195,7 @@ instance ConvProduct rep1 => ConvSum (C1 meta rep1) where
 type ConvProduct :: (k -> Type) -> Constraint
 
 class ConvProduct (rep1 :: k -> Type) where
-  type ToProduct (rep1 :: k -> Type) (end :: k -> Type) :: k -> Type 
+  type ToProduct (rep1 :: k -> Type) (end :: k -> Type) :: k -> Type
 
   convToProduct :: rep1 a -> end a -> ToProduct rep1 end a
 
@@ -165,9 +209,9 @@ instance (ConvProduct rep1, ConvProduct rep1') => ConvProduct (rep1 :*: rep1') w
 
   convFromProduct :: ToProduct rep1 (ToProduct rep1' end) a
                   -> ((rep1 :*: rep1') a -> end a -> res) -> res
-  convFromProduct prod next = 
-    convFromProduct prod $ \r end -> 
-      convFromProduct end $ \r' end' -> 
+  convFromProduct prod next =
+    convFromProduct prod $ \r end ->
+      convFromProduct end $ \r' end' ->
         next (r :*: r') end'
 
 instance ConvProduct U1 where
@@ -186,7 +230,7 @@ instance ConvField rep1 => ConvProduct (S1 meta rep1) where
   convToProduct (M1 s1) end = Pair (convToField s1) end
 
   convFromProduct :: Product (ToField rep1) end a -> (S1 meta rep1 a -> end a -> res) -> res
-  convFromProduct (Pair field end) next = 
+  convFromProduct (Pair field end) next =
     next (M1 (convFromField field)) end
 
 type  ConvField :: (k -> Type) -> Constraint
@@ -257,7 +301,7 @@ instance (ConvBæProduct rep1, CheckSum (Sum rep1 (Const Void)) ~ 'RightZero, vo
   convHæSum bæProd = InL (convHæProduct bæProd)
 
 instance ( CheckSum (Sum rep1 rep1') ~ 'NormalSum
-         , ConvBæProduct rep1 
+         , ConvBæProduct rep1
          , ConvBæSum rep1' )
       => ConvBæSum_ 'NormalSum (Sum rep1 rep1') where
   type BæSum_ 'NormalSum (Sum rep1 rep1') = Sum (BæProduct rep1) (BæSum rep1')
@@ -305,7 +349,7 @@ class tag ~ CheckProduct rep1
   convBæProduct :: rep1 ~> BæProduct rep1
   convHæProduct :: BæProduct rep1 ~> rep1
 
-instance unit ~ () => ConvBæProduct_ 'RightOne (Product rep1 (Const unit)) where 
+instance unit ~ () => ConvBæProduct_ 'RightOne (Product rep1 (Const unit)) where
   type BæProduct_ 'RightOne (Product rep1 (Const unit)) = rep1
 
   convBæProduct :: Product rep1 (Const ()) ~> rep1
@@ -317,7 +361,7 @@ instance unit ~ () => ConvBæProduct_ 'RightOne (Product rep1 (Const unit)) wher
 instance ( CheckProduct (Product rep1 rep1') ~ 'NormalProduct
          , ConvBæProduct rep1'
          )
-      => ConvBæProduct_ 'NormalProduct (Product rep1 rep1') where 
+      => ConvBæProduct_ 'NormalProduct (Product rep1 rep1') where
   type BæProduct_ 'NormalProduct (Product rep1 rep1') = Product rep1 (BæProduct rep1')
   convBæProduct :: Product rep1 rep1' ~> Product rep1 (BæProduct rep1')
   convBæProduct (Pair r r') = Pair r (convBæProduct r')
@@ -337,6 +381,33 @@ instance CheckProduct rep1 ~ 'NotProduct
 type Flatten :: (k -> Type) -> (k -> Type)
 type Flatten rep1 = ToSum rep1 (Const Void)
 
+-- | Flattens a generic representation.
+--
+-- Afaik GHC is free to nest the generic representation however it
+-- fancies. The representation of @data A a = A a a a a@ is for
+-- example
+--
+-- @
+-- Rep1 A = (Par1 :+: Par1) :+: (Par1 :+: Par1)   -- without metadata
+---
+-- This nesting making it trickier to cleanly replace the sums and
+-- specify 'Idiom's to match the products.
+--
+-- In addition it converts representations that use the @GHC.Generics@
+-- polynomial vocabulary into @Data.Functor@. So this should m
+--
+-- It also strips metadata.
+--
+-- @
+-- flatten :: Rep1 A
+--         ~> Flatten (Rep1 A)
+--
+-- flatten :: ((Par1 :+: Par1) :+: (Par1 :+: Par1))
+--         ~> Sum (Product Identity (Product Identity (Product Identity (Product Identity (Const ()))))) (Const Void)
+-- @
+--
+-- but it makes all the sums 0-terminated (0 = @Const Void@ = @V1@)
+-- and all the products 1-terminated (1 = @Const ()@ = @U1@).
 flatten :: ConvSum rep1 => rep1 ~> Flatten rep1
 flatten = convToSum (Proxy @(Const Void))
 
@@ -351,10 +422,11 @@ type family
   ReplaceSums (sum:sums) (Sum rep1 rep1') = rep1 `sum` ReplaceSums sums rep1'
   ReplaceSums '[]        rep1             = rep1
 
+-- | This is actually not safe and causes a segfault.
 replaceSums :: forall sums rep1. rep1 ~> ReplaceSums sums rep1
 replaceSums = unsafeCoerce
 
-placeSums :: forall sums rep1. ReplaceSums sums rep1 ~> rep1 
+placeSums :: forall sums rep1. ReplaceSums sums rep1 ~> rep1
 placeSums = unsafeCoerce
 
 type    NewSums :: [SumKind k] -> (k -> Type) -> (k -> Type)
@@ -366,10 +438,12 @@ instance (Generic1 f, ConvBæSum_ (CheckSum (ToSum (Rep1 f) (Const Void))) (ToSu
   from1 :: NewSums sums f ~> ReplaceSums sums (BæSum_ (CheckSum (ToSum (Rep1 f) (Const Void))) (ToSum (Rep1 f) (Const Void)))
   from1 = replaceSums @sums . convBæSum . flatten . from1 . reduce
 
-  to1 :: ReplaceSums sums (BæSum_ (CheckSum (ToSum (Rep1 f) (Const Void))) (ToSum (Rep1 f) (Const Void))) ~> NewSums sums f 
+  to1 :: ReplaceSums sums (BæSum_ (CheckSum (ToSum (Rep1 f) (Const Void))) (ToSum (Rep1 f) (Const Void))) ~> NewSums sums f
   to1 = NewSums . to1 . nest . convHæSum . placeSums @sums
 
 #ifndef HAS_GENERICALLY
+-- | This exists in versions that don't have 'Generically1',
+-- i.e. before base 4.17.0.0.
 type    Generically1 :: forall k. (k -> Type) -> (k -> Type)
 newtype Generically1 f a = Generically1 (f a)
   deriving newtype Generic1

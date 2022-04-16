@@ -3,6 +3,7 @@
 {-# Language DeriveFunctor            #-}
 {-# Language DerivingStrategies       #-}
 {-# Language EmptyDataDecls           #-}
+{-# Language FlexibleContexts         #-}
 {-# Language FlexibleInstances        #-}
 {-# Language InstanceSigs             #-}
 {-# Language MultiParamTypeClasses    #-}
@@ -14,7 +15,20 @@
 {-# Language TypeOperators            #-}
 {-# Language UndecidableInstances     #-}
 
-module Generic.Applicative.Idiom where
+module Generic.Applicative.Idiom
+  ( Idiom(..)
+  , Id
+  , Comp
+  , Initial
+  , Terminal
+  , Inner
+  , Outer
+  , Dup
+  , type (&&&)
+  , Fst
+  , Snd
+  )
+  where
 
 import Control.Applicative
 import Data.Functor.Compose
@@ -30,7 +44,7 @@ import Generic.Applicative.Internal
 --
 -- An appliative homomorphism is a polymorphic function between two
 -- applicative functors that preserves the `Applicative` structure.
--- 
+--
 -- @
 -- idiom (pure a) = pure a
 --
@@ -49,12 +63,14 @@ class (Applicative f, Applicative g) => Idiom tag f g where
 -- idiom :: f ~> f
 -- idiom = id
 -- @
-data Id 
+data Id
 instance (Applicative f, f ~ g) => Idiom Id f g where
  idiom :: f ~> g
  idiom = id
 
 -- | The left-to-right composition of applicative morphisms.
+infixr 7 `Comp`
+
 data Comp tag1 tag2
 instance (Idiom tag1 f g, Idiom tag2 g h) => Idiom (Comp tag1 tag2) f h where
  idiom :: f ~> h
@@ -63,7 +79,7 @@ instance (Idiom tag1 f g, Idiom tag2 g h) => Idiom (Comp tag1 tag2) f h where
 -- | The initial applicative morphism.
 --
 -- It turns 'Identity' into any 'Applicative' functor.
--- 
+--
 -- @
 -- idiom :: Identity ~> f
 -- idiom (Identity a) = pure a
@@ -74,7 +90,7 @@ instance (Identity ~ id, Applicative f) => Idiom Initial id f where
   idiom (Identity a) = pure a
 
 -- | The terminal applicative morphism.
--- 
+--
 -- It turns any applicative into @'Const' m@, or 'Proxy'
 --
 -- @
@@ -123,11 +139,11 @@ type family
   CheckIdiomDup _             = 'False
 
 -- | This applicative morphism duplicates a functor any number of times.
--- 
+--
 -- @
 -- idiom :: f ~> f
 -- idiom = id
--- 
+--
 -- idiom :: f ~> Product f f
 -- idiom as = Pair as as
 --
@@ -152,7 +168,7 @@ instance (f ~ g, IdiomDup (CheckIdiomDup g') g g') => IdiomDup 'True f (Product 
   idiomDup as = Pair as (idiomDup as)
 
 -- | An applicative functor for constructing a product.
--- 
+--
 -- @
 -- idiom :: f ~> Product g h
 -- idiom as = Pair (idiom as) (idiom as)
@@ -164,7 +180,7 @@ instance (Idiom tag1 f g, Idiom tag2 f h) => Idiom (tag1 &&& tag2) f (Product g 
 
 -- | The applicative functor that gets the first component of a
 -- product.
--- 
+--
 -- @
 -- idiom :: Product f g ~> f
 -- idiom (Pair as _) = as
@@ -176,7 +192,7 @@ instance (Applicative f, Applicative g) => Idiom Fst (Product f g) f where
 
 -- | The applicative functor that gets the second component of a
 -- product.
--- 
+--
 -- @
 -- idiom :: Product f g ~> g
 -- idiom (Pair _ bs) = bs

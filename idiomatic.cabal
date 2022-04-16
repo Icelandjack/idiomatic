@@ -1,10 +1,12 @@
 name:                idiomatic
-version:             0.1.0.0
+version:             0.1.1.0
 synopsis:            Deriving Applicative for sum types.. Idiomatically.
 description:         
 
   'Idiomatically' is used with 'DerivingVia' to derive 'Applicative'
   for types with multiple constructors.
+  .
+  The name comes from the original paper on 'Applicative's: <http://strictlypositive.org/Idiom.pdf Idioms: applicative programming with effects>.
   .
   It features an extensible domain-specific language of sums with
   `Applicative` instances. `Idiomatically` is then passed a type-level
@@ -57,16 +59,35 @@ extra-source-files:
   README.md
 cabal-version:       >=1.10
 
+source-repository head
+  type: git
+  location: https://github.com/Icelandjack/idiomatic
+
 library
   exposed-modules:
     Generic.Applicative
     Generic.Applicative.Internal
     Generic.Applicative.Idiom
-  build-depends:       base >=4.9 && <4.18
+  build-depends:       base == 4.*
   hs-source-dirs:      src
   default-language:    Haskell98
   ghc-options:         -Wall
 
-source-repository head
-  type: git
-  location: https://github.com/Icelandjack/idiomatic
+flag examples
+  description: Enable examples
+  default: False
+  manual: True
+
+-- cabal configure -f examples
+-- cabal run ZipList-example
+executable ZipList-example
+  main-is:          ZipList.hs
+  hs-source-dirs:   examples
+  default-language: Haskell98
+  build-depends:
+    base       == 4.*,
+    idiomatic
+  if flag(examples)
+    buildable: True
+  else
+    buildable: False

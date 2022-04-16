@@ -17,16 +17,18 @@
 {-# Language EmptyDataDecls             #-}
 {-# Language StandaloneKindSignatures   #-}
 
-module Generic.Applicative 
+module Generic.Applicative
   ( LeftBias(..)
   , RightBias(..)
   , Idiomatically
   , Generically1(..)
   , NewSums(..)
   , module Generic.Applicative.Idiom
+  , module GHC.Generics
   ) where
 
 import Control.Applicative
+import GHC.Generics
 import Data.Functor.Sum
 import Data.Kind
 
@@ -83,14 +85,18 @@ instance Idiom tag g f => Applicative (RightBias tag f g) where
 data Serve tag
 instance (Idiom tag l l', Idiom tag' l' r') => Idiom (Serve tag) l (LeftBias tag' l' r') where
   idiom :: l ~> LeftBias tag' l' r'
-  idiom = LeftBias . InL . idiom @_ @tag 
+  idiom = LeftBias . InL . idiom @_ @tag
 instance (Idiom tag l l', Idiom tag' r' l') => Idiom (Serve tag) l (RightBias tag' l' r') where
   idiom :: l ~> RightBias tag' l' r'
-  idiom = RightBias . InL . idiom @_ @tag 
+  idiom = RightBias . InL . idiom @_ @tag
 instance (Applicative r, Idiom tag l' r, Idiom tag' r' l') => Idiom (Serve tag) (RightBias tag' l' r') r where
   idiom :: RightBias tag' l' r' ~> r
   idiom (RightBias (InL ls')) = idiom @_ @tag @l' @r ls'
   idiom (RightBias (InR rs')) = idiom @_ @tag @l' @r (idiom @_ @tag' rs')
+instance (Applicative r, Idiom tag r' r, Idiom tag' l' r') => Idiom (Serve tag) (LeftBias tag' l' r') r where
+  idiom :: LeftBias tag' l' r' ~> r
+  idiom (LeftBias (InL ls')) = idiom @_ @tag @r' @r (idiom @_ @tag' @l' @r' ls')
+  idiom (LeftBias (InR rs')) = idiom @_ @tag @r' @r rs'
 
 type
   Served :: [SumKind k] -> [SumKind k]
@@ -103,22 +109,22 @@ type family
   Served (sum:sums)           = sum:Served sums
 
 -- | A modifier that is used to generically derive 'Applicative' for
--- sum types. 
--- 
+-- sum types.
+--
 -- Types with a single constructor can derive 'Applicative' using
 -- @Generically1@ from @GHC.Generics@:
 --
 -- @
 -- Generically1 f = Idiomatically f '[]
 -- @
--- 
+--
 -- A datatype with multiple constructors requires more input from the
 -- user: what constructor should be 'pure' and how to map between two
 -- different constructors in a law-abiding way.
--- 
+--
 -- This is done by specifying the /appliative morphisms/ ('Idiom')
 -- between each constructor.
--- 
+--
 -- 'Applicative' for 'Maybe' can be derived via the @Terminal@
 -- applicative morphism, biased to the right. @RightBias Terminal@
 -- means that when we lift over @Nothing@ and @Just@ it will result in
@@ -126,21 +132,21 @@ type family
 --
 -- @
 -- data Maybe a = Nothing | Just a
---   deriving 
+--   deriving
 --   stock Generic1
--- 
---   deriving (Functor, Applicative) 
---   via Idiomatically Maybe '[RightBias Terminal] 
+--
+--   deriving (Functor, Applicative)
+--   via Idiomatically Maybe '[RightBias Terminal]
 -- @
 --
 -- The same description derives 'Applicative' for @ZipList@:
--- 
+--
 -- @
 -- type ZipList :: Type -> Type
 -- data ZipList a = ZNil | a ::: ZipList
---   deriving 
---   stock Generic1 
--- 
+--   deriving
+--   stock Generic1
+--
 --   deriving (Functor, Applicative)
 --   via Idiomatically ZipList '[RightBias Terminal]
 -- @
