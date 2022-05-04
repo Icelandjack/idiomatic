@@ -27,14 +27,21 @@ module Generic.Applicative.Idiom
   , type (&&&)
   , Fst
   , Snd
+
+  , MonoidHomomorphism
+  , Monoidal(..)
+  , Length
+  , Fold
   )
   where
 
 import Control.Applicative
+import Data.Foldable
 import Data.Functor.Compose
 import Data.Functor.Identity
 import Data.Functor.Product
 import Data.Kind
+import Data.Monoid (Sum(..))
 import Data.Proxy
 
 import Generic.Applicative.Internal
@@ -46,8 +53,7 @@ import Generic.Applicative.Internal
 -- applicative functors that preserves the `Applicative` structure.
 --
 -- @
--- idiom (pure a) = pure a
---
+-- idiom (pure a)           = pure a
 -- idiom (liftA2 (·) as bs) = liftA2 (·) (idiom as) (idiom bs)
 -- @
 --
@@ -100,6 +106,7 @@ instance (Identity ~ id, Applicative f) => Idiom Initial id f where
 -- idiom :: f ~> Proxy
 -- idiom _ = Proxy
 -- @
+type Terminal :: Type
 data Terminal
 instance (Applicative f, Monoid m) => Idiom Terminal f (Const m) where
   idiom :: f ~> Const m
@@ -108,14 +115,13 @@ instance (Applicative f) => Idiom Terminal f Proxy where
   idiom :: f ~> Proxy
   idiom = mempty
 
--- Data.Functor.Compose
-
 -- | This applicative morphism composes a functor on the _inside_.
 --
 -- @
 -- idiom :: f ~> Compose f inner
 -- idiom = Compose . fmap pure
 -- @
+type Inner :: Type
 data Inner
 instance (Applicative f, Applicative inner, comp ~ Compose f inner) => Idiom Inner f comp where
   idiom :: f ~> Compose f inner
@@ -127,12 +133,12 @@ instance (Applicative f, Applicative inner, comp ~ Compose f inner) => Idiom Inn
 -- idiom :: f ~> Compose outer f
 -- idiom = Compose . pure
 -- @
+type Outer :: Type
 data Outer
 instance (Applicative outer, Applicative f, comp ~ Compose outer f) => Idiom Outer f comp where
   idiom :: f ~> Compose outer f
   idiom = Compose . pure
 
--- Data.Functor.Product
 type family
   CheckIdiomDup f where
   CheckIdiomDup (Product _ _) = 'True
@@ -150,6 +156,7 @@ type family
 -- idiom :: f ~> Product f (Product f f)
 -- idiom as = Pair as (Pair as as)
 -- @
+type Dup :: Type
 data Dup
 instance (Applicative f, Applicative g, IdiomDup (CheckIdiomDup g) f g) => Idiom Dup f g where
   idiom :: f ~> g
@@ -173,6 +180,7 @@ instance (f ~ g, IdiomDup (CheckIdiomDup g') g g') => IdiomDup 'True f (Product 
 -- idiom :: f ~> Product g h
 -- idiom as = Pair (idiom as) (idiom as)
 -- @
+type (&&&) :: k1 -> k2 -> Type
 data tag1 &&& tag2
 instance (Idiom tag1 f g, Idiom tag2 f h) => Idiom (tag1 &&& tag2) f (Product g h) where
   idiom :: f ~> Product g h
@@ -185,6 +193,7 @@ instance (Idiom tag1 f g, Idiom tag2 f h) => Idiom (tag1 &&& tag2) f (Product g 
 -- idiom :: Product f g ~> f
 -- idiom (Pair as _) = as
 -- @
+type Fst :: Type
 data Fst
 instance (Applicative f, Applicative g) => Idiom Fst (Product f g) f where
   idiom :: Product f g ~> f
@@ -197,7 +206,64 @@ instance (Applicative f, Applicative g) => Idiom Fst (Product f g) f where
 -- idiom :: Product f g ~> g
 -- idiom (Pair _ bs) = bs
 -- @
+type Snd :: Type
 data Snd
 instance (Applicative f, Applicative g) => Idiom Snd (Product f g) g where
   idiom :: Product f g ~> g
   idiom (Pair _ bs) = bs
+
+type MonoidHomomorphism :: k -> Type
+data MonoidHomomorphism tag
+instance Monoidal tag a b => Idiom (MonoidHomomorphism tag) (Const a) (Const b) where
+  idiom :: Const a ~> Const b
+  idiom (Const a) = Const (monoidal @_ @tag a)
+
+-- | 'Monoidal' captures an "monoid homomorphism" between two
+-- 'Monoid's, indexed by a @tag@.
+--
+-- An monoid homomorphism is a function between two 'Monoid's that
+-- preserves the ` structure.
+--
+-- @
+-- monoidal mempty   = mempty
+-- monoidal (a <> b) = monoidal a <> monoidal b
+-- @
+--
+-- It is a special case of the applicative homomorphism ('Idiom')
+-- between two constant functors.
+--
+-- @
+-- -- >>> liftA2 (,) (Ok1 (words "one is enough")) (Ok2 "!")
+-- "oneisenough!"
+-- data Ok a = Ok1 [String] | Ok2 String
+--   deriving 
+--   stock Generic
+-- 
+--   deriving Applicative
+--   via Idiomatically Ok
+--    '[ LeftBias (MonoidHomomorphism Fold)
+--     ]
+-- @
+type  Monoidal :: k -> Type -> Type -> Constraint
+class (Monoid a, Monoid b) => Monoidal tag a b where
+  monoidal :: a -> b
+
+instance (Monoid a, a ~ b) => Monoidal Id a b where
+  monoidal :: a -> a
+  monoidal = id
+
+instance (Monoidal tag1 a b, Monoidal tag2 b c) => Monoidal (Comp tag1 tag2) a c where
+  monoidal :: a -> c
+  monoidal = monoidal @_ @tag2 @b @c . monoidal @_ @tag1 @a @b
+
+type Length :: Type
+data Length
+instance (Foldable f, Monoid (f a)) => Monoidal Length (f a) (Sum Int) where
+  monoidal :: f a -> Sum Int
+  monoidal as = Sum (length as)
+
+type Fold :: Type
+data Fold
+instance (Foldable f, Monoid a, Monoid (f a)) => Monoidal Fold (f a) a where
+  monoidal :: f a -> a
+  monoidal = fold
